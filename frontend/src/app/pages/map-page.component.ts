@@ -18,6 +18,7 @@ import { ReportService } from '../core/report.service';
 import { CONT_COLORS, LAYERS, LayerDef } from '../core/layer-meta';
 import { TEAM } from '../core/credits';
 import { ScaleRatioControl, ZoomLocateControl } from '../core/map-controls';
+import { MapTourHooks } from '../core/map-tour-hooks';
 
 type PanelTab = 'colonia' | 'capas' | 'info';
 
@@ -62,33 +63,30 @@ type PanelTab = 'colonia' | 'capas' | 'info';
             </button>
           </div>
 
-          <div class="mb-2 flex items-center gap-2">
-            <label class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div class="mb-2">
+            <label class="flex flex-col gap-0.5">
               <span class="flex justify-between text-[10px] font-bold text-brand-700">
                 Opacidad <span class="tabular-nums">{{ opacity() }}%</span>
               </span>
               <input class="opacity-range" type="range" min="15" max="100"
                 [ngModel]="opacity()" (ngModelChange)="setOpacity($event)" />
             </label>
-            <a class="icon-ghost-box shrink-0" [href]="geoDownloadUrl" download="colonias_clusters.geojson" title="Descargar capa">
-              <app-icon icon="line-md:download-loop" [size]="18" color="#4b1c71" />
-            </a>
           </div>
 
           <!-- Tabs -->
           <div class="panel-tabs" role="tablist">
-            <button type="button" role="tab" class="panel-tab" [class.active]="tab() === 'colonia'" (click)="tab.set('colonia')">
+            <button id="tour-tab-colonia" type="button" role="tab" class="panel-tab" [class.active]="tab() === 'colonia'" (click)="tab.set('colonia')">
               <app-icon icon="line-md:home-twotone-alt" [size]="14" [color]="tab() === 'colonia' ? '#4b1c71' : '#7f4ca5'" />
               Colonia
               @if (selected()) {
                 <span class="tab-dot"></span>
               }
             </button>
-            <button type="button" role="tab" class="panel-tab" [class.active]="tab() === 'capas'" (click)="tab.set('capas')">
+            <button id="tour-tab-capas" type="button" role="tab" class="panel-tab" [class.active]="tab() === 'capas'" (click)="tab.set('capas')">
               <app-icon icon="line-md:layers-3-twotone" [size]="14" [color]="tab() === 'capas' ? '#4b1c71' : '#7f4ca5'" />
               Capas
             </button>
-            <button type="button" role="tab" class="panel-tab" [class.active]="tab() === 'info'" (click)="tab.set('info')">
+            <button id="tour-tab-info" type="button" role="tab" class="panel-tab" [class.active]="tab() === 'info'" (click)="tab.set('info')">
               <app-icon icon="line-md:document-list" [size]="14" [color]="tab() === 'info' ? '#4b1c71' : '#7f4ca5'" />
               Info
             </button>
@@ -96,9 +94,8 @@ type PanelTab = 'colonia' | 'capas' | 'info';
         </div>
 
         <div class="min-h-0 flex-1 overflow-y-auto">
-          <!-- TAB COLONIA: radiografía -->
-          @if (tab() === 'colonia') {
-            <div class="flex min-h-full flex-col">
+          <!-- TAB COLONIA: radiografía (se mantiene en DOM para el tour) -->
+          <div class="flex min-h-full flex-col" [hidden]="tab() !== 'colonia'">
               <div class="border-b border-brand-300/40 bg-gradient-to-br from-brand-50 to-white px-4 pb-3 pt-4">
                 <div class="mb-2 flex h-14 items-end justify-center">
                   <app-icon icon="line-md:home-twotone-alt" [size]="48" color="#7f4ca5" animate="float" />
@@ -160,8 +157,12 @@ type PanelTab = 'colonia' | 'capas' | 'info';
                     <div class="flex justify-between rounded-xl px-1 py-1"><dt class="text-brand-700">Población</dt><dd class="font-bold">{{ s.pob }}</dd></div>
                   </dl>
 
+                  <p class="mt-3 rounded-xl border border-brand-300/50 bg-white px-3 py-2 text-[11px] leading-relaxed text-brand-700">
+                    La estrategia INE es <span class="font-bold text-brand-900">por perfil</span> (cluster K-Means),
+                    no una distinta por colonia. Todas las colonias con este perfil comparten el mismo mensaje, canales y acciones.
+                  </p>
                   <a routerLink="/campanas" [queryParams]="{c: s.cluster_id}"
-                    class="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white">
+                    class="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-brand-900 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white">
                     <app-icon icon="line-md:bell-alert-twotone-loop" [size]="16" color="#fff" />
                     Estrategia de este perfil
                   </a>
@@ -199,12 +200,10 @@ type PanelTab = 'colonia' | 'capas' | 'info';
                   }
                 }
               </div>
-            </div>
-          }
+          </div>
 
-          <!-- TAB CAPAS -->
-          @if (tab() === 'capas') {
-            <div class="px-3 py-3">
+          <!-- TAB CAPAS (siempre en DOM para que el tour pueda resaltar cada capa) -->
+          <div class="px-3 py-3" [hidden]="tab() !== 'capas'">
               <div class="mb-3 grid grid-cols-2 gap-2">
                 @for (c of layerCards(); track c.label) {
                   <div class="stat-tile">
@@ -225,11 +224,11 @@ type PanelTab = 'colonia' | 'capas' | 'info';
                     Visible
                   </label>
                 </div>
-                <div class="max-h-[min(50vh,380px)] overflow-y-auto border-t border-brand-300/40 px-1 py-1">
+                <div id="tour-layers-list" class="max-h-[min(50vh,380px)] overflow-y-auto border-t border-brand-300/40 px-1 py-1">
                   @for (g of layerGroups; track g) {
                     <p class="px-2 pb-0.5 pt-2 text-[9px] font-extrabold uppercase tracking-wide text-brand-700/70">{{ g }}</p>
                     @for (L of layersByGroup(g); track L.id) {
-                      <button type="button" class="layer-row" [class.active]="activeLayer() === L.id" (click)="setLayer(L.id)">
+                      <button type="button" class="layer-row" [id]="'tour-layer-' + L.id" [class.active]="activeLayer() === L.id" (click)="setLayer(L.id)">
                         <span class="layer-dot" [style.background]="activeLayer() === L.id ? '#4b1c71' : '#dbb6ee'"></span>
                         <span class="min-w-0 flex-1 truncate text-left">{{ L.label }}</span>
                       </button>
@@ -261,12 +260,10 @@ type PanelTab = 'colonia' | 'capas' | 'info';
                   }
                 </div>
               </div>
-            </div>
-          }
+          </div>
 
           <!-- TAB INFO -->
-          @if (tab() === 'info') {
-            <div class="px-4 py-3">
+          <div class="px-4 py-3" [hidden]="tab() !== 'info'">
               <section class="meta-block">
                 <h3>Descripción</h3>
                 <p>{{ active().description }}</p>
@@ -304,8 +301,7 @@ type PanelTab = 'colonia' | 'capas' | 'info';
                   Elaboración: {{ team.join(', ') }}.
                 </p>
               </section>
-            </div>
-          }
+          </div>
         </div>
       </aside>
     }
@@ -335,6 +331,11 @@ export class MapPageComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private http = inject(HttpClient);
   private report = inject(ReportService);
+  private tourHooks = inject(MapTourHooks);
+  private readonly tourApi = {
+    ensurePanel: (t: PanelTab) => this.openPanel(t),
+    setLayer: (id: string) => this.setLayer(id),
+  };
 
   perfiles = signal<Perfil[]>([]);
   selected = signal<any | null>(null);
@@ -348,7 +349,6 @@ export class MapPageComponent implements OnInit, OnDestroy {
   team = TEAM;
   contColors = CONT_COLORS;
   layerGroups = [...new Set(LAYERS.map((l) => l.group))];
-  geoDownloadUrl = this.api.geojsonUrl();
 
   active = computed(() => LAYERS.find((l) => l.id === this.activeLayer()) || LAYERS[0]);
 
@@ -378,6 +378,7 @@ export class MapPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.tourHooks.register(this.tourApi);
     this.api.perfiles().subscribe((p) => {
       const colored = p.perfiles.map((x, i) => ({
         ...x,
@@ -395,6 +396,7 @@ export class MapPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.tourHooks.unregister(this.tourApi);
     this.map?.remove();
   }
 

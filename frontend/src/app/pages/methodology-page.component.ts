@@ -53,7 +53,6 @@ import { DATA_SOURCE_ITEMS, ORG, PROJECT_TAGLINE, TEAM } from '../core/credits';
             <article class="rounded-2xl border border-brand-300/50 bg-brand-50/50 p-4">
               <p class="text-xs font-extrabold uppercase tracking-wider text-brand-700">{{ s.org.label }}</p>
               <p class="mt-1 text-sm font-bold text-brand-900">{{ s.title }}</p>
-              <p class="mt-1 text-[12px] text-brand-700">Carpeta: <code class="rounded bg-white px-1.5 py-0.5">data/raw/{{ s.folder }}</code></p>
               <p class="mt-2 text-sm leading-relaxed text-brand-700">{{ s.detail }}</p>
             </article>
           }

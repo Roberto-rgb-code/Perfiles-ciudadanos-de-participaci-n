@@ -1,25 +1,46 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { driver, Driver } from 'driver.js';
+import { driver, DriveStep, Driver } from 'driver.js';
+import { LAYERS } from './layer-meta';
+import { MapTourHooks } from './map-tour-hooks';
 
-const TOUR_KEY = 'pcp_zmg_tour_v1';
+const TOUR_KEY = 'pcp_zmg_tour_v2';
 
 @Injectable({ providedIn: 'root' })
 export class TourService {
   private router = inject(Router);
+  private mapHooks = inject(MapTourHooks);
   private active?: Driver;
 
   /** Arranca el tour; si force=false solo la primera visita. */
   async start(force = false) {
     if (!force && localStorage.getItem(TOUR_KEY) === '1') return;
 
-    // El recorrido empieza en el mapa (inicio)
     if (!this.router.url.startsWith('/mapa')) {
       await this.router.navigateByUrl('/mapa');
-      await new Promise((r) => setTimeout(r, 450));
+      await new Promise((r) => setTimeout(r, 500));
     } else {
       await new Promise((r) => setTimeout(r, 200));
     }
+
+    // Panel abierto en Colonia antes de highlight
+    this.mapHooks.ensurePanel('colonia');
+    await new Promise((r) => setTimeout(r, 120));
+
+    const layerSteps: DriveStep[] = LAYERS.map((L) => ({
+      element: () => {
+        this.mapHooks.ensurePanel('capas');
+        this.mapHooks.setLayer(L.id);
+        queueScrollIntoView(`#tour-layer-${L.id}`);
+        return document.querySelector(`#tour-layer-${L.id}`) as Element;
+      },
+      popover: {
+        title: `Capa · ${L.label}`,
+        description: `${L.description} Fuente: ${L.source}.`,
+        side: 'left',
+        align: 'start',
+      },
+    }));
 
     this.active?.destroy();
     this.active = driver({
@@ -79,10 +100,55 @@ export class TourService {
           popover: {
             title: 'Panel del mapa',
             description:
-              'Aquí ves la radiografía de la colonia (al hacer clic), cambias capas temáticas y consultas fuentes / metodología de cada capa.',
+              'Radiografía de la colonia (clic en el mapa), capas temáticas e info/fuentes. La estrategia INE es por perfil K-Means: todas las colonias del mismo perfil comparten esa estrategia.',
             side: 'left',
             align: 'start',
           },
+          onHighlightStarted: () => this.mapHooks.ensurePanel('colonia'),
+        },
+        {
+          element: '#tour-tab-colonia',
+          popover: {
+            title: 'Pestaña Colonia',
+            description:
+              'Al seleccionar un polígono ves variables CCPC y el perfil asignado. El botón de estrategia abre la campaña de ese perfil (no una estrategia distinta por cada colonia).',
+            side: 'left',
+            align: 'start',
+          },
+          onHighlightStarted: () => this.mapHooks.ensurePanel('colonia'),
+        },
+        {
+          element: '#tour-tab-capas',
+          popover: {
+            title: 'Pestaña Capas',
+            description:
+              'Aquí están todas las capas temáticas. El tour las recorre una por una y las activa en el mapa.',
+            side: 'left',
+            align: 'start',
+          },
+          onHighlightStarted: () => this.mapHooks.ensurePanel('capas'),
+        },
+        {
+          element: '#tour-layers-list',
+          popover: {
+            title: 'Lista de capas',
+            description:
+              'Agrupadas por Segmentación, NSE, Participación y Sociodemográfico. Siguiente: cada capa con su leyenda en el mapa.',
+            side: 'left',
+            align: 'start',
+          },
+          onHighlightStarted: () => this.mapHooks.ensurePanel('capas'),
+        },
+        ...layerSteps,
+        {
+          element: '#tour-tab-info',
+          popover: {
+            title: 'Pestaña Info',
+            description: 'Descripción, fuente, metodología y referencia cartográfica de la capa activa.',
+            side: 'left',
+            align: 'start',
+          },
+          onHighlightStarted: () => this.mapHooks.ensurePanel('info'),
         },
         {
           element: '#tour-download',
@@ -114,4 +180,10 @@ export class TourService {
     localStorage.removeItem(TOUR_KEY);
     void this.start(true);
   }
+}
+
+function queueScrollIntoView(sel: string) {
+  requestAnimationFrame(() => {
+    document.querySelector(sel)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 }

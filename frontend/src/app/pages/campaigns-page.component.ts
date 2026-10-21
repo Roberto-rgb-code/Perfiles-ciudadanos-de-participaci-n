@@ -36,7 +36,8 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
               <p class="chip mb-1">Para el INE · campañas focalizadas</p>
               <h2 class="text-2xl font-bold text-brand-900">Estrategias diferenciadas</h2>
               <p class="mt-1 max-w-3xl text-sm text-brand-700">
-                Busca por canal, tono o mensaje. El PDF incluye solo las estrategias filtradas.
+                Una estrategia por perfil K-Means (no por colonia): todas las colonias del mismo perfil heredan
+                mensaje, canales y acciones. Busca por canal, tono o mensaje; el PDF incluye solo las filtradas.
               </p>
             </div>
           </div>
