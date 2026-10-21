@@ -132,7 +132,9 @@ def load_turnout(path: Path, year: int) -> pd.DataFrame | None:
     )
     g = tmp.groupby("seccion", as_index=False).agg(lista=("lista", "sum"), votos=("votos", "sum"))
     g[f"tasa_{year}"] = safe_div(g["votos"], g["lista"]).clip(0, 1)
-    return g[["seccion", f"tasa_{year}"]]
+    g[f"lista_{year}"] = g["lista"]
+    g[f"votos_{year}"] = g["votos"]
+    return g[["seccion", f"tasa_{year}", f"lista_{year}", f"votos_{year}"]]
 
 
 def load_colonias(raw: Path) -> gpd.GeoDataFrame:
@@ -192,17 +194,7 @@ def attach_nse(colonias: gpd.GeoDataFrame, raw: Path) -> gpd.GeoDataFrame:
     return out
 
 
-def attach_turnout(colonias: gpd.GeoDataFrame, raw: Path) -> gpd.GeoDataFrame:
-    sec = _read_shp(raw / "Cartografia_electoral" / "SECCION.shp")
-    if sec.crs is None:
-        # cartografia IEPC often UTM
-        try:
-            sec = sec.set_crs(32613)
-        except Exception:
-            sec = sec.set_crs(4326)
-    sec = sec.to_crs(4326)
-    sec["seccion"] = sec["seccion"].astype(str).str.replace(r"\.0$", "", regex=True)
-
+def _load_turnout_table(raw: Path) -> pd.DataFrame:
     turns: list[pd.DataFrame] = []
     mapping = {
         2018: raw / "electoral" / "diputadoslocales_2018.xlsx",
@@ -220,14 +212,73 @@ def attach_turnout(colonias: gpd.GeoDataFrame, raw: Path) -> gpd.GeoDataFrame:
     for other in turns[1:]:
         t = t.merge(other, on="seccion", how="outer")
     for y in (2018, 2021, 2024):
-        col = f"tasa_{y}"
-        if col not in t.columns:
-            t[col] = np.nan
-    # Si falta 2018, aproximar con 2021
+        for prefix in ("tasa", "lista", "votos"):
+            col = f"{prefix}_{y}"
+            if col not in t.columns:
+                t[col] = np.nan
+    # Si falta 2018, aproximar tasa con 2021
     if t["tasa_2018"].isna().all() and t["tasa_2021"].notna().any():
         t["tasa_2018"] = t["tasa_2021"]
         print("INFO: tasa_2018 aproximada con 2021 (archivo 2018 sin lista nominal)")
+    return t
+
+
+def load_secciones_participacion(raw: Path, colonias: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Polígonos de sección INE (original) con tasa/lista/votos — filtro espacial ZMG."""
+    sec = _read_shp(raw / "Cartografia_electoral" / "SECCION.shp")
+    if sec.crs is None:
+        try:
+            sec = sec.set_crs(32613)
+        except Exception:
+            sec = sec.set_crs(4326)
+    sec = sec.to_crs(4326)
+    sec["seccion"] = sec["seccion"].astype(str).str.replace(r"\.0$", "", regex=True)
+    t = _load_turnout_table(raw)
     sec = sec.merge(t, on="seccion", how="left")
+
+    # Solo secciones que intersectan colonias ZMG
+    hit = gpd.sjoin(
+        sec[["seccion", "geometry"]],
+        colonias[["geometry"]].copy(),
+        how="inner",
+        predicate="intersects",
+    )
+    keep = set(hit["seccion"].astype(str).unique())
+    sec = sec[sec["seccion"].astype(str).isin(keep)].copy()
+    print(f"Secciones ZMG (intersectan colonias): {len(sec)}")
+
+    for y in (2018, 2021, 2024):
+        sec[f"tasa_{y}"] = pd.to_numeric(sec[f"tasa_{y}"], errors="coerce")
+        sec[f"lista_{y}"] = pd.to_numeric(sec[f"lista_{y}"], errors="coerce").fillna(0)
+        sec[f"votos_{y}"] = pd.to_numeric(sec[f"votos_{y}"], errors="coerce").fillna(0)
+
+    keep_cols = [
+        "seccion",
+        "municipio",
+        "distrito_l",
+        "distrito_f",
+        "tasa_2018",
+        "tasa_2021",
+        "tasa_2024",
+        "lista_2018",
+        "lista_2021",
+        "lista_2024",
+        "votos_2018",
+        "votos_2021",
+        "votos_2024",
+        "geometry",
+    ]
+    keep_cols = [c for c in keep_cols if c in sec.columns]
+    return sec[keep_cols].copy()
+
+
+def attach_turnout(
+    colonias: gpd.GeoDataFrame,
+    raw: Path,
+    sec: gpd.GeoDataFrame | None = None,
+) -> gpd.GeoDataFrame:
+    if sec is None:
+        sec = load_secciones_participacion(raw, colonias)
 
     pts = colonias.copy()
     pts["geometry"] = pts.geometry.representative_point()
@@ -244,7 +295,6 @@ def attach_turnout(colonias: gpd.GeoDataFrame, raw: Path) -> gpd.GeoDataFrame:
             how="left",
             max_distance=1200,
         )
-        # geometry already projected; drop geom for merge
         j = j.drop(columns=["geometry"], errors="ignore")
     agg = j.groupby("NUMCOL", as_index=False).agg(
         tasa_2018=("tasa_2018", "mean"),
@@ -322,8 +372,17 @@ def run_kmeans(gdf: gpd.GeoDataFrame, k: int) -> tuple[gpd.GeoDataFrame, dict]:
     return gdf, meta
 
 
+def _sqlalchemy_url(url: str) -> str:
+    """Railway / libpq URLs → driver psycopg3 para SQLAlchemy."""
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://") and "+psycopg" not in url and "+psycopg2" not in url:
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
 def persist_db(gdf: gpd.GeoDataFrame, meta: dict) -> None:
-    url = os.environ.get("DATABASE_URL", settings.database_url)
+    url = _sqlalchemy_url(os.environ.get("DATABASE_URL", settings.database_url))
     # SQLAlchemy geoalchemy optional — use geopandas to_postgis
     try:
         from sqlalchemy import create_engine, text
@@ -383,7 +442,8 @@ def main() -> int:
         print("ERROR: pocas colonias; revisa nombres MUNS")
         return 1
     gdf = attach_nse(gdf, raw)
-    gdf = attach_turnout(gdf, raw)
+    sec_gdf = load_secciones_participacion(raw, gdf)
+    gdf = attach_turnout(gdf, raw, sec=sec_gdf)
     gdf, meta = run_kmeans(gdf, k)
 
     # Simplify suave: tolerancia alta abría huecos visibles entre colonias vecinas
@@ -391,13 +451,21 @@ def main() -> int:
     gdf_web["geometry"] = gdf_web.geometry.simplify(0.00003, preserve_topology=True)
     gdf_web = _fix_geometries(gdf_web)
 
+    sec_web = sec_gdf.copy()
+    sec_web["geometry"] = sec_web.geometry.simplify(0.00002, preserve_topology=True)
+    sec_web = _fix_geometries(sec_web)
+
     geo_path = out / "colonias_clusters.geojson"
+    sec_path = out / "secciones_participacion.geojson"
     csv_path = out / "colonias_clusters.csv"
     meta_path = out / "perfiles.json"
     gdf_web.to_file(geo_path, driver="GeoJSON")
+    sec_web.to_file(sec_path, driver="GeoJSON")
     pd.DataFrame(gdf_web.drop(columns="geometry")).to_csv(csv_path, index=False)
+    meta["n_secciones"] = int(len(sec_web))
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Wrote {geo_path}")
+    print(f"Wrote {sec_path} ({len(sec_web)} secciones)")
     print(f"Wrote {meta_path}")
     for p in meta["perfiles"]:
         print(f"  cluster {p['cluster_id']}: {p['nombre']} n={p['n_colonias']} part2024={p['metricas']['tasa_2024']}%")

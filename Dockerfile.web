@@ -1,0 +1,20 @@
+# Frontend Angular + nginx (proxy /api → API_UPSTREAM en runtime)
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY frontend/package.json ./
+RUN npm install --legacy-peer-deps
+COPY frontend/ .
+ARG API_URL=/api
+ENV API_URL=$API_URL
+RUN npm run build
+
+FROM nginx:1.27-alpine
+RUN apk add --no-cache gettext
+COPY frontend/nginx.railway.conf /etc/nginx/templates/default.conf.template
+COPY --from=build /app/dist/segmentador-ccpc-zmg/browser /usr/share/nginx/html
+COPY frontend/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+ENV API_UPSTREAM=http://api.railway.internal:8000
+ENV PORT=80
+EXPOSE 80
+CMD ["/docker-entrypoint.sh"]

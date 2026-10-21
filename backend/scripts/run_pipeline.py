@@ -15,8 +15,9 @@ def main() -> int:
     out = Path(os.environ.get("DATA_PROCESSED", settings.data_processed))
     force = os.environ.get("FORCE_ETL", "0") == "1"
     geo = out / "colonias_clusters.geojson"
+    sec = out / "secciones_participacion.geojson"
     meta = out / "perfiles.json"
-    if geo.is_file() and meta.is_file() and not force:
+    if geo.is_file() and meta.is_file() and sec.is_file() and not force:
         print("Artefactos presentes — skip ETL (FORCE_ETL=1 para regenerar)")
         # still try DB load if empty
         try:

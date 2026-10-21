@@ -6,6 +6,8 @@ export type LayerDef = {
   label: string;
   group: string;
   kind: 'cat' | 'cont';
+  /** Geometría del mapa: colonia (default) o sección electoral INE */
+  geometry?: 'colonia' | 'seccion';
   prop: string;
   asPct?: boolean;
   stops?: number[];
@@ -114,6 +116,62 @@ export const LAYERS: LayerDef[] = [
     source: SRC_INE,
     sourceDetail: PART_DETAIL,
     methodology: 'Misma metodología de transferencia sección → colonia.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'sec_tasa24',
+    label: 'Secciones · Participación 2024',
+    group: 'Secciones INE (original)',
+    geometry: 'seccion',
+    kind: 'cont',
+    prop: 'tasa_2024',
+    asPct: true,
+    stops: [0.35, 0.45, 0.55, 0.65, 0.75],
+    legendLabels: ['≤35%', '45%', '55%', '65%', '≥75%'],
+    description:
+      'Polígonos de sección electoral (cartografía INE) con tasa de participación 2024. Fuente original antes de agregar a colonia.',
+    frequency: 'Proceso electoral',
+    lastUpdate: '2024',
+    source: SRC_INE,
+    sourceDetail: PART_DETAIL,
+    methodology:
+      'Coropleta por sección: votos / lista nominal. En el clic se muestran tasa, lista nominal y votos (2018–2024).',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'sec_tasa21',
+    label: 'Secciones · Participación 2021',
+    group: 'Secciones INE (original)',
+    geometry: 'seccion',
+    kind: 'cont',
+    prop: 'tasa_2021',
+    asPct: true,
+    stops: [0.3, 0.4, 0.5, 0.6, 0.7],
+    legendLabels: ['≤30%', '40%', '50%', '60%', '≥70%'],
+    description: 'Participación 2021 a nivel sección electoral (geometría INE original).',
+    frequency: 'Proceso electoral',
+    lastUpdate: '2021',
+    source: SRC_INE,
+    sourceDetail: PART_DETAIL,
+    methodology: 'Misma fuente seccional; detalle de lista y votos al seleccionar la sección.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'sec_tasa18',
+    label: 'Secciones · Participación 2018',
+    group: 'Secciones INE (original)',
+    geometry: 'seccion',
+    kind: 'cont',
+    prop: 'tasa_2018',
+    asPct: true,
+    stops: [0.3, 0.4, 0.5, 0.6, 0.7],
+    legendLabels: ['≤30%', '40%', '50%', '60%', '≥70%'],
+    description: 'Participación 2018 a nivel sección electoral (geometría INE original).',
+    frequency: 'Proceso electoral',
+    lastUpdate: '2018',
+    source: SRC_INE,
+    sourceDetail: PART_DETAIL,
+    methodology: 'Misma fuente seccional; si 2018 carece de lista, la tasa puede aproximarse con 2021.',
     cartoRef: CARTO,
   },
   {

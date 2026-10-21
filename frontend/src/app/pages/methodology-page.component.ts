@@ -76,7 +76,9 @@ import { DATA_SOURCE_ITEMS, ORG, PROJECT_TAGLINE, TEAM } from '../core/credits';
           </li>
           <li class="rounded-2xl bg-brand-50 p-3">
             <b class="text-brand-900">D. Participación electoral.</b> Con cartografía y resultados del INE se estiman
-            tasas 2018, 2021 y 2024 por sección y se transfieren a colonia (within / nearest).
+            tasas 2018, 2021 y 2024 por sección (votos / lista nominal) y se transfieren a colonia (within / nearest).
+            En el mapa también se puede consultar la capa original de <b>secciones</b> (tasa + lista + votos al clic),
+            sin sustituir las capas agregadas a colonia.
           </li>
           <li class="rounded-2xl bg-brand-50 p-3">
             <b class="text-brand-900">E. Segmentación.</b> K-Means (k=5, features estandarizadas) produce clusters;

@@ -33,9 +33,11 @@ def _processed() -> Path:
 def health():
     geo = _processed() / "colonias_clusters.geojson"
     meta = _processed() / "perfiles.json"
+    sec = _processed() / "secciones_participacion.geojson"
     return {
         "ok": geo.is_file() and meta.is_file(),
         "geojson": geo.is_file(),
+        "secciones": sec.is_file(),
         "perfiles": meta.is_file(),
         "universo": "ZMG Jalisco",
         "n_clusters": settings.n_clusters,
@@ -64,6 +66,15 @@ def geojson():
     path = _processed() / "colonias_clusters.geojson"
     if not path.is_file():
         raise HTTPException(503, "GeoJSON no disponible")
+    return FileResponse(path, media_type="application/geo+json")
+
+
+@app.get("/api/geojson/secciones")
+def geojson_secciones():
+    """Polígonos de sección electoral (fuente INE original) con tasa/lista/votos."""
+    path = _processed() / "secciones_participacion.geojson"
+    if not path.is_file():
+        raise HTTPException(503, "GeoJSON de secciones no disponible — ejecuta FORCE_ETL=1")
     return FileResponse(path, media_type="application/geo+json")
 
 

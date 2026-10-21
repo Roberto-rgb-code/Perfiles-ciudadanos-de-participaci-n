@@ -112,6 +112,53 @@ type PanelTab = 'colonia' | 'capas' | 'info';
 
               <div class="flex-1 px-4 py-3">
                 @if (selected(); as s) {
+                  @if (s.kind === 'seccion') {
+                    <div class="mb-3 rounded-2xl bg-brand-50 px-3 py-2.5">
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="text-[10px] font-bold uppercase tracking-wider text-brand-700">Sección electoral (INE)</p>
+                          <p class="mt-0.5 text-sm font-bold text-brand-900">Sección {{ s.seccion }}</p>
+                          <p class="text-[11px] text-brand-700/80">Municipio {{ s.municipio }} · fuente original</p>
+                        </div>
+                        <button type="button" class="icon-ghost shrink-0" (click)="clearSelection()" title="Limpiar selección">
+                          <app-icon icon="line-md:close-circle" [size]="18" color="#7f4ca5" />
+                        </button>
+                      </div>
+                      <p class="mt-2 rounded-xl bg-white/80 px-2 py-1.5 text-[11px] font-semibold text-brand-900">
+                        Capa: <span class="text-brand-700">{{ active().label }}</span> →
+                        <span class="text-brand-900">{{ s.layerValue }}</span>
+                      </p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="rounded-2xl bg-brand-50/80 p-3 text-center">
+                        <p class="text-lg font-bold tabular-nums text-brand-900">{{ s.tasa_2024 }}%</p>
+                        <p class="text-[10px] font-semibold text-brand-700">Part. 2024</p>
+                      </div>
+                      <div class="rounded-2xl bg-brand-50/80 p-3 text-center">
+                        <p class="text-lg font-bold tabular-nums text-brand-900">{{ s.lista_2024 }}</p>
+                        <p class="text-[10px] font-semibold text-brand-700">Lista nominal 2024</p>
+                      </div>
+                      <div class="rounded-2xl bg-brand-50/80 p-3 text-center">
+                        <p class="text-lg font-bold tabular-nums text-brand-900">{{ s.votos_2024 }}</p>
+                        <p class="text-[10px] font-semibold text-brand-700">Votos 2024</p>
+                      </div>
+                      <div class="rounded-2xl bg-brand-50/80 p-3 text-center">
+                        <p class="text-lg font-bold tabular-nums text-brand-900">{{ s.tasa_2021 }}%</p>
+                        <p class="text-[10px] font-semibold text-brand-700">Part. 2021</p>
+                      </div>
+                    </div>
+                    <dl class="mt-3 space-y-1.5 text-[12px]">
+                      <div class="flex justify-between rounded-xl px-1 py-1"><dt class="text-brand-700">Lista 2021</dt><dd class="font-bold">{{ s.lista_2021 }}</dd></div>
+                      <div class="flex justify-between rounded-xl px-1 py-1"><dt class="text-brand-700">Votos 2021</dt><dd class="font-bold">{{ s.votos_2021 }}</dd></div>
+                      <div class="flex justify-between rounded-xl px-1 py-1"><dt class="text-brand-700">Part. 2018</dt><dd class="font-bold">{{ s.tasa_2018 }}%</dd></div>
+                      <div class="flex justify-between rounded-xl px-1 py-1"><dt class="text-brand-700">Lista 2018</dt><dd class="font-bold">{{ s.lista_2018 }}</dd></div>
+                      <div class="flex justify-between rounded-xl px-1 py-1"><dt class="text-brand-700">Votos 2018</dt><dd class="font-bold">{{ s.votos_2018 }}</dd></div>
+                    </dl>
+                    <p class="mt-3 rounded-xl border border-brand-300/50 bg-white px-3 py-2 text-[11px] leading-relaxed text-brand-700">
+                      Esta es la geometría <span class="font-bold text-brand-900">original por sección</span>.
+                      Las capas del grupo Participación muestran la misma tasa ya agregada a colonia.
+                    </p>
+                  } @else {
                   <div class="mb-3 rounded-2xl bg-brand-50 px-3 py-2.5">
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0">
@@ -166,6 +213,7 @@ type PanelTab = 'colonia' | 'capas' | 'info';
                     <app-icon icon="line-md:bell-alert-twotone-loop" [size]="16" color="#fff" />
                     Estrategia de este perfil
                   </a>
+                  }
                 } @else {
                   <div class="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-brand-300 bg-brand-50/50 px-4 py-10 text-center">
                     <app-icon icon="line-md:cursor-default-click" [size]="32" color="#7f4ca5" animate="float" />
@@ -354,10 +402,27 @@ export class MapPageComponent implements OnInit, OnDestroy {
 
   private map?: maplibregl.Map;
   private geo: any;
+  private geoSec: any;
   private meta: any;
   private nameBy: Record<number, string> = {};
   private colorBy: Record<number, string> = {};
   private readonly palette = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
+
+  private isSeccionLayer(L?: LayerDef) {
+    return (L || this.active()).geometry === 'seccion';
+  }
+
+  private fmtInt(n: any) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '—';
+    return Math.round(v).toLocaleString('es-MX');
+  }
+
+  private fmtPct(n: any) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '—';
+    return (v * 100).toFixed(1);
+  }
 
   layersByGroup(g: string) {
     return LAYERS.filter((l) => l.group === g);
@@ -403,29 +468,48 @@ export class MapPageComponent implements OnInit, OnDestroy {
   setLayer(id: string) {
     this.activeLayer.set(id);
     this.applyPaint();
+    this.syncLayerVisibility();
     this.recomputeCards();
-    // Actualiza valor de capa si hay selección, sin perder radiografía
     const s = this.selected();
-    if (s?.raw) {
-      const L = this.active();
+    const L = this.active();
+    if (s?.raw && s.kind === 'colonia' && !this.isSeccionLayer(L)) {
       this.selected.set({ ...s, layerValue: this.formatProp(L, s.raw[L.prop]) });
+    } else if (s?.raw && s.kind === 'seccion' && this.isSeccionLayer(L)) {
+      this.selected.set({ ...s, layerValue: this.formatProp(L, s.raw[L.prop]) });
+    } else if (s && ((s.kind === 'colonia') !== !this.isSeccionLayer(L))) {
+      // Cambia de geometría: limpia selección incompatible
+      this.selected.set(null);
     }
   }
 
   setOpacity(v: number | string) {
     const n = Math.max(15, Math.min(100, Number(v)));
     this.opacity.set(n);
-    if (this.map?.getLayer('colonias-fill') && this.layerVisible()) {
-      this.map.setPaintProperty('colonias-fill', 'fill-opacity', n / 100);
+    if (!this.map || !this.layerVisible()) return;
+    const id = this.isSeccionLayer() ? 'secciones-fill' : 'colonias-fill';
+    if (this.map.getLayer(id)) {
+      this.map.setPaintProperty(id, 'fill-opacity', n / 100);
     }
   }
 
   toggleVisible() {
-    const next = !this.layerVisible();
-    this.layerVisible.set(next);
-    if (!this.map?.getLayer('colonias-fill')) return;
-    this.map.setLayoutProperty('colonias-fill', 'visibility', next ? 'visible' : 'none');
-    this.map.setLayoutProperty('colonias-line', 'visibility', next ? 'visible' : 'none');
+    this.layerVisible.set(!this.layerVisible());
+    this.syncLayerVisibility();
+  }
+
+  private syncLayerVisibility() {
+    if (!this.map) return;
+    const show = this.layerVisible();
+    const sec = this.isSeccionLayer();
+    const setVis = (id: string, on: boolean) => {
+      if (this.map?.getLayer(id)) {
+        this.map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      }
+    };
+    setVis('colonias-fill', show && !sec);
+    setVis('colonias-line', show && !sec);
+    setVis('secciones-fill', show && sec);
+    setVis('secciones-line', show && sec);
   }
 
   exportPdf() {
@@ -472,16 +556,16 @@ export class MapPageComponent implements OnInit, OnDestroy {
           source: 'colonias',
           paint: { 'line-color': '#4b1c71', 'line-width': 0.35, 'line-opacity': 0.35 },
         });
-        this.applyPaint();
-        this.recomputeCards();
 
         this.map.on('click', 'colonias-fill', (e) => {
+          if (this.isSeccionLayer()) return;
           const f = e.features?.[0];
           if (!f?.properties) return;
           const p = f.properties as Record<string, any>;
           const cid = Number(p['cluster_id']);
           const L = this.active();
           this.selected.set({
+            kind: 'colonia',
             raw: p,
             cluster_id: cid,
             colonia: p['NOMBRE'],
@@ -502,11 +586,15 @@ export class MapPageComponent implements OnInit, OnDestroy {
           this.tab.set('colonia');
         });
         this.map.on('mouseenter', 'colonias-fill', () => {
-          if (this.map) this.map.getCanvas().style.cursor = 'pointer';
+          if (this.map && !this.isSeccionLayer()) this.map.getCanvas().style.cursor = 'pointer';
         });
         this.map.on('mouseleave', 'colonias-fill', () => {
           if (this.map) this.map.getCanvas().style.cursor = '';
         });
+
+        this.applyPaint();
+        this.syncLayerVisibility();
+        this.recomputeCards();
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const feat of geo.features || []) {
@@ -522,6 +610,66 @@ export class MapPageComponent implements OnInit, OnDestroy {
           });
         }
       });
+
+      this.http.get(this.api.seccionesGeojsonUrl()).subscribe({
+        next: (geo: any) => {
+          if (!this.map) return;
+          this.geoSec = geo;
+          this.map.addSource('secciones', { type: 'geojson', data: geo, tolerance: 0.25 });
+          this.map.addLayer({
+            id: 'secciones-fill',
+            type: 'fill',
+            source: 'secciones',
+            layout: { visibility: 'none' },
+            paint: {
+              'fill-color': '#b57edc',
+              'fill-opacity': this.opacity() / 100,
+              'fill-antialias': true,
+            },
+          });
+          this.map.addLayer({
+            id: 'secciones-line',
+            type: 'line',
+            source: 'secciones',
+            layout: { visibility: 'none' },
+            paint: { 'line-color': '#4b1c71', 'line-width': 0.45, 'line-opacity': 0.45 },
+          });
+          this.map.on('click', 'secciones-fill', (e) => {
+            if (!this.isSeccionLayer()) return;
+            const f = e.features?.[0];
+            if (!f?.properties) return;
+            const p = f.properties as Record<string, any>;
+            const L = this.active();
+            this.selected.set({
+              kind: 'seccion',
+              raw: p,
+              seccion: p['seccion'],
+              municipio: p['municipio'] ?? '—',
+              tasa_2018: this.fmtPct(p['tasa_2018']),
+              tasa_2021: this.fmtPct(p['tasa_2021']),
+              tasa_2024: this.fmtPct(p['tasa_2024']),
+              lista_2018: this.fmtInt(p['lista_2018']),
+              lista_2021: this.fmtInt(p['lista_2021']),
+              lista_2024: this.fmtInt(p['lista_2024']),
+              votos_2018: this.fmtInt(p['votos_2018']),
+              votos_2021: this.fmtInt(p['votos_2021']),
+              votos_2024: this.fmtInt(p['votos_2024']),
+              layerValue: this.formatProp(L, p[L.prop]),
+            });
+            this.panelOpen.set(true);
+            this.tab.set('colonia');
+          });
+          this.map.on('mouseenter', 'secciones-fill', () => {
+            if (this.map && this.isSeccionLayer()) this.map.getCanvas().style.cursor = 'pointer';
+          });
+          this.map.on('mouseleave', 'secciones-fill', () => {
+            if (this.map) this.map.getCanvas().style.cursor = '';
+          });
+          this.applyPaint();
+          this.syncLayerVisibility();
+        },
+        error: () => console.warn('GeoJSON de secciones no disponible aún'),
+      });
     });
   }
 
@@ -535,13 +683,15 @@ export class MapPageComponent implements OnInit, OnDestroy {
   }
 
   private recomputeCards() {
-    const feats: any[] = this.geo?.features || [];
     const L = this.active();
+    const sec = this.isSeccionLayer(L);
+    const feats: any[] = (sec ? this.geoSec?.features : this.geo?.features) || [];
+    const unit = sec ? 'Secciones' : 'Colonias';
     if (L.kind === 'cat') {
       const perfiles = this.perfiles();
       const top = [...perfiles].sort((a, b) => b.n_colonias - a.n_colonias)[0];
       this.layerCards.set([
-        { label: 'Colonias ZMG', value: String(feats.length || this.nColonias()) },
+        { label: 'Colonias ZMG', value: String(this.geo?.features?.length || this.nColonias()) },
         { label: 'Perfiles (k)', value: String(perfiles.length) },
         { label: 'Perfil mayor', value: top ? String(top.n_colonias) : '—' },
         { label: '% del mayor', value: top ? `${top.pct_universo}%` : '—' },
@@ -551,7 +701,7 @@ export class MapPageComponent implements OnInit, OnDestroy {
     const vals = feats.map((f) => Number(f.properties?.[L.prop])).filter((v) => Number.isFinite(v));
     if (!vals.length) {
       this.layerCards.set([
-        { label: 'Colonias', value: String(feats.length) },
+        { label: unit, value: String(feats.length) },
         { label: 'Mínimo', value: '—' },
         { label: 'Promedio', value: '—' },
         { label: 'Máximo', value: '—' },
@@ -563,7 +713,7 @@ export class MapPageComponent implements OnInit, OnDestroy {
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
     const fmt = (v: number) => this.formatProp(L, v);
     this.layerCards.set([
-      { label: 'Colonias con dato', value: String(vals.length) },
+      { label: `${unit} con dato`, value: String(vals.length) },
       { label: 'Mínimo', value: fmt(min) },
       { label: 'Promedio', value: fmt(avg) },
       { label: 'Máximo', value: fmt(max) },
@@ -571,20 +721,26 @@ export class MapPageComponent implements OnInit, OnDestroy {
   }
 
   private applyPaint() {
-    if (!this.map?.getLayer('colonias-fill')) return;
+    if (!this.map) return;
     const L = this.active();
-    if (L.kind === 'cat') {
-      const matchExpr: any[] = ['match', ['to-number', ['get', 'cluster_id']]];
-      for (const p of this.perfiles()) matchExpr.push(p.cluster_id, p.color);
-      matchExpr.push('#dbb6ee');
-      this.map.setPaintProperty('colonias-fill', 'fill-color', matchExpr);
-    } else {
-      const stops = L.stops || [0, 0.25, 0.5, 0.75, 1];
-      const expr: any[] = ['interpolate', ['linear'], ['to-number', ['get', L.prop]]];
-      stops.forEach((s, i) => expr.push(s, CONT_COLORS[Math.min(i, CONT_COLORS.length - 1)]));
-      this.map.setPaintProperty('colonias-fill', 'fill-color', expr);
-    }
-    this.map.setPaintProperty('colonias-fill', 'fill-opacity', this.opacity() / 100);
+    const opacity = this.opacity() / 100;
+    const paintFill = (layerId: string) => {
+      if (!this.map?.getLayer(layerId)) return;
+      if (L.kind === 'cat' && layerId === 'colonias-fill') {
+        const matchExpr: any[] = ['match', ['to-number', ['get', 'cluster_id']]];
+        for (const p of this.perfiles()) matchExpr.push(p.cluster_id, p.color);
+        matchExpr.push('#dbb6ee');
+        this.map.setPaintProperty(layerId, 'fill-color', matchExpr);
+      } else {
+        const stops = L.stops || [0, 0.25, 0.5, 0.75, 1];
+        const expr: any[] = ['interpolate', ['linear'], ['to-number', ['get', L.prop]]];
+        stops.forEach((s, i) => expr.push(s, CONT_COLORS[Math.min(i, CONT_COLORS.length - 1)]));
+        this.map.setPaintProperty(layerId, 'fill-color', expr);
+      }
+      this.map.setPaintProperty(layerId, 'fill-opacity', opacity);
+    };
+    paintFill('colonias-fill');
+    paintFill('secciones-fill');
   }
 
   private flattenCoords(geom: any): [number, number][] {

@@ -48,4 +48,8 @@ export class ApiService {
   geojsonUrl() {
     return `${this.base}/geojson`;
   }
+
+  seccionesGeojsonUrl() {
+    return `${this.base}/geojson/secciones`;
+  }
 }
