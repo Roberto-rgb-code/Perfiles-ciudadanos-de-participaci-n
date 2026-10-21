@@ -33,6 +33,7 @@ type PanelTab = 'colonia' | 'capas' | 'info';
 
     <!-- A la izquierda del panel cuando está abierto (evita encimarse) -->
     <div
+      id="tour-download"
       class="pointer-events-none absolute top-4 z-20 flex gap-2"
       [style.right.px]="panelOpen() ? 400 : 16"
     >
@@ -48,7 +49,7 @@ type PanelTab = 'colonia' | 'capas' | 'info';
     </div>
 
     @if (panelOpen()) {
-      <aside class="maplab-panel absolute bottom-3 right-3 top-3 z-10 flex w-[min(100%,370px)] flex-col overflow-hidden">
+      <aside id="tour-map-panel" class="maplab-panel absolute bottom-3 right-3 top-3 z-10 flex w-[min(100%,370px)] flex-col overflow-hidden">
         <!-- Header compacto -->
         <div class="shrink-0 border-b border-brand-300/40 px-3 pt-3">
           <div class="mb-2 flex items-center justify-between gap-2">
