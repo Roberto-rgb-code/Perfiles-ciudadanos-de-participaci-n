@@ -1,10 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { driver, DriveStep, Driver } from 'driver.js';
-import { LAYERS } from './layer-meta';
+import { LAYERS, LayerDef } from './layer-meta';
 import { MapTourHooks } from './map-tour-hooks';
 
-const TOUR_KEY = 'pcp_zmg_tour_v2';
+const TOUR_KEY = 'pcp_zmg_tour_v3';
 
 @Injectable({ providedIn: 'root' })
 export class TourService {
@@ -23,24 +23,12 @@ export class TourService {
       await new Promise((r) => setTimeout(r, 200));
     }
 
-    // Panel abierto en Colonia antes de highlight
     this.mapHooks.ensurePanel('colonia');
     await new Promise((r) => setTimeout(r, 120));
 
-    const layerSteps: DriveStep[] = LAYERS.map((L) => ({
-      element: () => {
-        this.mapHooks.ensurePanel('capas');
-        this.mapHooks.setLayer(L.id);
-        queueScrollIntoView(`#tour-layer-${L.id}`);
-        return document.querySelector(`#tour-layer-${L.id}`) as Element;
-      },
-      popover: {
-        title: `Capa · ${L.label}`,
-        description: `${L.description} Fuente: ${L.source}.`,
-        side: 'left',
-        align: 'start',
-      },
-    }));
+    const coloniaLayers = LAYERS.filter((L) => L.geometry !== 'seccion');
+    const seccionLayers = LAYERS.filter((L) => L.geometry === 'seccion');
+    const firstSecId = seccionLayers[0]?.id;
 
     this.active?.destroy();
     this.active = driver({
@@ -122,7 +110,7 @@ export class TourService {
           popover: {
             title: 'Pestaña Capas',
             description:
-              'Aquí están todas las capas temáticas. El tour las recorre una por una y las activa en el mapa.',
+              'Aquí están todas las capas temáticas: perfiles, NSE, participación por colonia, sociodemografía y también Secciones INE (original). El tour las activa una por una.',
             side: 'left',
             align: 'start',
           },
@@ -133,13 +121,33 @@ export class TourService {
           popover: {
             title: 'Lista de capas',
             description:
-              'Agrupadas por Segmentación, NSE, Participación y Sociodemográfico. Siguiente: cada capa con su leyenda en el mapa.',
+              'Grupos: Segmentación, NSE, Participación (colonia), Secciones INE (original) y Sociodemográfico. Primero las capas por colonia; después la geometría seccional del INE.',
             side: 'left',
             align: 'start',
           },
           onHighlightStarted: () => this.mapHooks.ensurePanel('capas'),
         },
-        ...layerSteps,
+        ...coloniaLayers.map((L) => this.layerStep(L)),
+        ...(firstSecId
+          ? [
+              {
+                element: () => {
+                  this.mapHooks.ensurePanel('capas');
+                  this.mapHooks.setLayer(firstSecId);
+                  queueScrollIntoView(`#tour-layer-${firstSecId}`);
+                  return document.querySelector(`#tour-layer-${firstSecId}`) as Element;
+                },
+                popover: {
+                  title: 'Secciones INE (original)',
+                  description:
+                    'Aquí empieza el grupo de secciones electorales: la geometría original del INE (antes de agregar a colonia). El mapa pinta polígonos de sección; al hacer clic ves tasa, lista nominal y votos (2018–2024). No sustituye las capas de participación por colonia.',
+                  side: 'left',
+                  align: 'start',
+                },
+              } as DriveStep,
+            ]
+          : []),
+        ...seccionLayers.map((L) => this.layerStep(L, true)),
         {
           element: '#tour-tab-info',
           popover: {
@@ -176,8 +184,31 @@ export class TourService {
     this.active.drive();
   }
 
+  private layerStep(L: LayerDef, isSeccion = false): DriveStep {
+    const extra = isSeccion
+      ? ' Clic en una sección: tasa, lista nominal y votos. Fuente original INE.'
+      : '';
+    return {
+      element: () => {
+        this.mapHooks.ensurePanel('capas');
+        this.mapHooks.setLayer(L.id);
+        queueScrollIntoView(`#tour-layer-${L.id}`);
+        return document.querySelector(`#tour-layer-${L.id}`) as Element;
+      },
+      popover: {
+        title: isSeccion ? `Sección INE · ${L.label}` : `Capa · ${L.label}`,
+        description: `${L.description} Fuente: ${L.source}.${extra}`,
+        side: 'left',
+        align: 'start',
+      },
+    };
+  }
+
   resetAndStart() {
     localStorage.removeItem(TOUR_KEY);
+    // Limpia también la clave anterior por si quedó marcada
+    localStorage.removeItem('pcp_zmg_tour_v2');
+    localStorage.removeItem('pcp_zmg_tour_v1');
     void this.start(true);
   }
 }
