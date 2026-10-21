@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ccpc
+      POSTGRES_PASSWORD: ccpc
+      POSTGRES_DB: segmentador_zmg
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ccpc -d segmentador_zmg"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://ccpc:ccpc@db:5432/segmentador_zmg
+      DATA_RAW: /data/raw
+      DATA_PROCESSED: /data/processed
+      N_CLUSTERS: "5"
+      CORS_ORIGINS: "http://localhost:4200,http://localhost:8080"
+    volumes:
+      - ./data/raw:/data/raw:ro
+      - ./data/processed:/data/processed
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        API_URL: /api
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

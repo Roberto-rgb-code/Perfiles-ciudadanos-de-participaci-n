@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+node_modules/
+dist/
+.angular/
+data/processed/*
+!data/processed/.gitkeep
+# Artefactos locales pesados / OS
+*.log
+.DS_Store
+._*
+migration-dumps/
+*.zip
+.idea/
+.vscode/

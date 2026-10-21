@@ -1,0 +1,251 @@
+import { ORG } from './credits';
+
+/** Metadatos estilo MapaLab por capa temática */
+export type LayerDef = {
+  id: string;
+  label: string;
+  group: string;
+  kind: 'cat' | 'cont';
+  prop: string;
+  asPct?: boolean;
+  stops?: number[];
+  legendLabels?: string[];
+  description: string;
+  frequency: string;
+  lastUpdate: string;
+  source: string;
+  sourceDetail: string;
+  methodology: string;
+  cartoRef: string;
+};
+
+export const CONT_COLORS = ['#fff0ff', '#dbb6ee', '#b57edc', '#7f4ca5', '#4b1c71'];
+
+const SRC_IIEG = ORG.iieg.label;
+const SRC_INEGI = ORG.inegi.label;
+const SRC_INE = ORG.ine.label;
+
+const SOCIO_DETAIL = `${SRC_IIEG}. Carpeta Sociodemografico — indicadores por colonia (ISDCOL).`;
+const NSE_DETAIL = `${SRC_INEGI}. Carpeta Nivel_socioeconomico — AGEB NSE Jalisco, transferido a colonia por centroide.`;
+const PART_DETAIL = `${SRC_INE}. Carpetas electoral y Cartografia_electoral — participación y secciones electorales.`;
+const CARTO = `${SRC_INE} (límites seccionales) + ${SRC_IIEG} (colonia ISDCOL). Universo ZMG. WGS84 (EPSG:4326).`;
+
+export const LAYERS: LayerDef[] = [
+  {
+    id: 'perfiles',
+    label: 'Perfiles de participación',
+    group: 'Segmentación',
+    kind: 'cat',
+    prop: 'cluster_id',
+    description:
+      'Capa poligonal de colonias ZMG clasificadas con K-Means (k=5) según variables CCPC agregadas: edad, sexo, escolaridad, nivel socioeconómico y participación electoral.',
+    frequency: 'Producto del hackatón (pipeline reproducible)',
+    lastUpdate: '2026',
+    source: `Integración ${ORG.ine.acronym} + ${ORG.iieg.acronym} + ${ORG.inegi.acronym}`,
+    sourceDetail: `${PART_DETAIL} ${SOCIO_DETAIL} ${NSE_DETAIL}`,
+    methodology:
+      'Clustering no supervisado (K-Means) sobre features estandarizadas a nivel colonia. Sin datos personales identificables.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'nse',
+    label: 'Nivel socioeconómico',
+    group: 'Nivel socioeconómico',
+    kind: 'cont',
+    prop: 'nse_score',
+    stops: [1, 3, 5, 7, 9],
+    legendLabels: ['1–2', '3–4', '5', '6–7', '8–9'],
+    description:
+      'Capa coroplética del nivel socioeconómico estimado por colonia (escala ordinal 1–9 a partir de AGEB).',
+    frequency: 'Según capa AGEB de origen',
+    lastUpdate: 'Capa NSE Jalisco',
+    source: SRC_INEGI,
+    sourceDetail: NSE_DETAIL,
+    methodology:
+      'Se asigna el NSE del AGEB al centroide de cada colonia y se convierte a puntuación ordinal para visualización y clustering.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'tasa24',
+    label: 'Participación 2024',
+    group: 'Participación',
+    kind: 'cont',
+    prop: 'tasa_2024',
+    asPct: true,
+    stops: [0.35, 0.45, 0.55, 0.65, 0.75],
+    legendLabels: ['≤35%', '45%', '55%', '65%', '≥75%'],
+    description: 'Tasa de participación electoral 2024 (votos / lista nominal) agregada a colonia.',
+    frequency: 'Proceso electoral',
+    lastUpdate: '2024',
+    source: SRC_INE,
+    sourceDetail: PART_DETAIL,
+    methodology: 'Agregación espacial de secciones electorales a colonias por intersección/centroide.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'tasa21',
+    label: 'Participación 2021',
+    group: 'Participación',
+    kind: 'cont',
+    prop: 'tasa_2021',
+    asPct: true,
+    stops: [0.3, 0.4, 0.5, 0.6, 0.7],
+    legendLabels: ['≤30%', '40%', '50%', '60%', '≥70%'],
+    description: 'Tasa de participación electoral 2021 agregada a colonia.',
+    frequency: 'Proceso electoral',
+    lastUpdate: '2021',
+    source: SRC_INE,
+    sourceDetail: PART_DETAIL,
+    methodology: 'Misma metodología de transferencia sección → colonia.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'tasa18',
+    label: 'Participación 2018',
+    group: 'Participación',
+    kind: 'cont',
+    prop: 'tasa_2018',
+    asPct: true,
+    stops: [0.3, 0.4, 0.5, 0.6, 0.7],
+    legendLabels: ['≤30%', '40%', '50%', '60%', '≥70%'],
+    description: 'Tasa de participación electoral 2018 agregada a colonia.',
+    frequency: 'Proceso electoral',
+    lastUpdate: '2018',
+    source: SRC_INE,
+    sourceDetail: PART_DETAIL,
+    methodology: 'Misma metodología de transferencia sección → colonia.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'lista',
+    label: 'Población 18+ (proxy lista nominal)',
+    group: 'Participación',
+    kind: 'cont',
+    prop: 'P_18YMAS',
+    stops: [200, 800, 2000, 5000, 12000],
+    legendLabels: ['≤200', '800', '2 mil', '5 mil', '≥12 mil'],
+    description:
+      'Población de 18 años y más por colonia. Se usa como proxy territorial del tamaño de lista nominal.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'Variable P_18YMAS del marco sociodemográfico por colonia (IIEG).',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'joven',
+    label: '% jóvenes 18–24',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'pct_joven',
+    asPct: true,
+    stops: [0.08, 0.12, 0.16, 0.2, 0.28],
+    legendLabels: ['≤8%', '12%', '16%', '20%', '≥28%'],
+    description: 'Proporción de población joven (18–24) respecto a la base demográfica de la colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'P_18A24 / base poblacional (P_15YMAS o POBTOT).',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'mayor',
+    label: '% adultos 60+',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'pct_mayor',
+    asPct: true,
+    stops: [0.08, 0.12, 0.16, 0.22, 0.3],
+    legendLabels: ['≤8%', '12%', '16%', '22%', '≥30%'],
+    description: 'Proporción de población de 60 años y más por colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'P_60YMAS / base poblacional.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'mujer',
+    label: '% mujeres',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'pct_mujer',
+    asPct: true,
+    stops: [0.48, 0.5, 0.52, 0.54, 0.56],
+    legendLabels: ['≤48%', '50%', '52%', '54%', '≥56%'],
+    description: 'Proporción de población femenina por colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'POBFEM / POBTOT.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'esc',
+    label: 'Escolaridad promedio',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'escolaridad',
+    stops: [6, 8, 10, 12, 14],
+    legendLabels: ['≤6', '8', '10', '12', '≥14'],
+    description: 'Grado promedio de escolaridad (años) por colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'Variable GRAPROES del marco sociodemográfico.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'pob',
+    label: 'Población total',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'POBTOT',
+    stops: [500, 1500, 4000, 8000, 15000],
+    legendLabels: ['≤500', '1.5 mil', '4 mil', '8 mil', '≥15 mil'],
+    description: 'Población total estimada por colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'Variable POBTOT.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'pea',
+    label: 'Población econ. activa (PEA)',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'PEA',
+    stops: [200, 800, 2000, 4000, 8000],
+    legendLabels: ['≤200', '800', '2 mil', '4 mil', '≥8 mil'],
+    description: 'Población económicamente activa por colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'Variable PEA.',
+    cartoRef: CARTO,
+  },
+  {
+    id: 'internet',
+    label: 'Viviendas con internet',
+    group: 'Sociodemográfico',
+    kind: 'cont',
+    prop: 'VPH_INTER',
+    stops: [50, 200, 500, 1200, 2500],
+    legendLabels: ['≤50', '200', '500', '1.2 mil', '≥2.5 mil'],
+    description: 'Viviendas particulares habitadas con internet por colonia.',
+    frequency: 'Según marco ISDCOL',
+    lastUpdate: 'ISDCOL 2020–2021',
+    source: SRC_IIEG,
+    sourceDetail: SOCIO_DETAIL,
+    methodology: 'Variable VPH_INTER.',
+    cartoRef: CARTO,
+  },
+];

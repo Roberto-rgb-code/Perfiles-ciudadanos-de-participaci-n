@@ -1,0 +1,23 @@
+IMPORTANTE — En esta carpeta solo deben estar los archivos REALES del shapefile.
+
+Archivos que SÍ importan (sin punto inicial):
+  AGEB_NSE_JAL.shp   (varios MB, no 176 bytes)
+  AGEB_NSE_JAL.shx
+  AGEB_NSE_JAL.dbf
+  AGEB_NSE_JAL.prj
+
+Archivos que NO sirven (metadatos macOS, se ignoran):
+  ._AGEB_NSE_JAL.shp
+  ._AGEB_NSE_JAL.dbf
+  etc.
+
+Si solo ves archivos que empiezan por "._" de ~176 bytes, el shapefile NO se copió bien desde Mac.
+
+Cómo copiar bien:
+  1. En Mac, en Terminal: dot_clean "/ruta/a/Nivel socioeconomico"
+  2. Comprimir la carpeta en .zip y copiar el ZIP a Windows
+  3. Extraer aquí y verificar que AGEB_NSE_JAL.shp pesa varios megabytes
+
+Validar en PowerShell:
+  cd miguel-gis
+  .\scripts\validate-ageb.ps1
