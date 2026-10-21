@@ -1,168 +1,169 @@
 import { Injectable } from '@angular/core';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { DATA_SOURCES, PROJECT_TAGLINE, TEAM } from './credits';
 import { Perfil } from './api.service';
 
 @Injectable({ providedIn: 'root' })
 export class ReportService {
-  /**
-   * Genera informe e intenta imprimir / Guardar como PDF.
-   * Usa Blob URL (más fiable que window.open('') + document.write).
-   */
+  /** Genera y descarga un PDF real (.pdf), sin HTML intermedio. */
   downloadInforme(perfiles: Perfil[], meta?: { n_colonias?: number; k?: number; municipios?: string[] }) {
     if (!perfiles?.length) {
       alert('Aún no hay perfiles para exportar. Espera a que cargue la API.');
       return;
     }
 
-    const html = this.buildHtml(perfiles, meta);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const margin = 14;
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 16;
 
-    const w = window.open(url, '_blank');
-    if (!w) {
-      // Popup bloqueado → descarga HTML para abrir e imprimir
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'informe-segmentador-ccpc-zmg.html';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      alert(
-        'El navegador bloqueó la ventana emergente.\n' +
-          'Se descargó el informe HTML: ábrelo y usa Ctrl+P → Guardar como PDF.',
-      );
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(75, 28, 113);
+    doc.text('Perfiles ciudadanos de participación', margin, y);
+    y += 7;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(127, 76, 165);
+    const tag = doc.splitTextToSize(PROJECT_TAGLINE, pageW - margin * 2);
+    doc.text(tag, margin, y);
+    y += tag.length * 5 + 4;
+
+    const nCol = meta?.n_colonias ?? perfiles.reduce((a, p) => a + (p.n_colonias || 0), 0);
+    doc.setTextColor(75, 28, 113);
+    doc.setFontSize(10);
+    doc.text(`Colonias: ${nCol}  ·  k=${meta?.k ?? perfiles.length}  ·  Universo: ZMG Jalisco`, margin, y);
+    y += 6;
+    if (meta?.municipios?.length) {
+      const munLine = doc.splitTextToSize(`Municipios: ${meta.municipios.join(', ')}`, pageW - margin * 2);
+      doc.setFontSize(9);
+      doc.setTextColor(127, 76, 165);
+      doc.text(munLine, margin, y);
+      y += munLine.length * 4 + 4;
     }
 
-    const tryPrint = () => {
-      try {
-        w.focus();
-        w.print();
-      } catch {
-        /* ignore */
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(75, 28, 113);
+    doc.text('1. Resumen de perfiles (K-Means)', margin, y);
+    y += 3;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Perfil', 'Colonias', '% univ.', 'Part. 2024', '% joven', 'Escolaridad', 'NSE']],
+      body: perfiles.map((p) => [
+        p.nombre,
+        String(p.n_colonias),
+        `${p.pct_universo}%`,
+        `${p.metricas?.['tasa_2024'] ?? '—'}%`,
+        `${p.metricas?.['pct_joven_prom'] ?? '—'}%`,
+        String(p.metricas?.['escolaridad_prom'] ?? '—'),
+        String(p.metricas?.['nse_prom'] ?? '—'),
+      ]),
+      styles: { font: 'helvetica', fontSize: 8, textColor: [75, 28, 113] },
+      headStyles: { fillColor: [75, 28, 113], textColor: 255 },
+      alternateRowStyles: { fillColor: [255, 240, 255] },
+      margin: { left: margin, right: margin },
+    });
+
+    y = ((doc as any).lastAutoTable?.finalY || y) + 10;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('2. Estrategias diferenciadas para el INE', margin, y);
+    y += 7;
+
+    for (const p of perfiles) {
+      if (y > 250) {
+        doc.addPage();
+        y = 16;
       }
-    };
+      doc.setFillColor(255, 240, 255);
+      doc.roundedRect(margin, y - 3, pageW - margin * 2, 4, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(75, 28, 113);
+      doc.text(p.nombre, margin, y + 2);
+      y += 8;
 
-    // load event + respaldo por timeout
-    w.addEventListener('load', () => setTimeout(tryPrint, 200));
-    setTimeout(tryPrint, 700);
-    setTimeout(() => URL.revokeObjectURL(url), 120_000);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(90, 58, 122);
+      const desc = doc.splitTextToSize(p.descripcion || '', pageW - margin * 2);
+      doc.text(desc, margin, y);
+      y += desc.length * 4 + 2;
+
+      doc.setFont('helvetica', 'italic');
+      const msg = doc.splitTextToSize(`“${p.estrategia?.mensaje || ''}”`, pageW - margin * 2);
+      doc.text(msg, margin, y);
+      y += msg.length * 4 + 2;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(75, 28, 113);
+      const canales = `Canales: ${(p.estrategia?.canales || []).join(' · ')}`;
+      const tono = `Tono: ${p.estrategia?.tono || '—'}`;
+      const acc = `Acciones: ${(p.estrategia?.acciones || []).join('; ')}`;
+      for (const line of [canales, tono, acc]) {
+        const wrapped = doc.splitTextToSize(line, pageW - margin * 2);
+        if (y + wrapped.length * 4 > 280) {
+          doc.addPage();
+          y = 16;
+        }
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * 4 + 2;
+      }
+      y += 4;
+    }
+
+    if (y > 240) {
+      doc.addPage();
+      y = 16;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('3. Método', margin, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const metodo = doc.splitTextToSize(
+      'Se segmentaron colonias de la ZMG con K-Means sobre variables agregadas: estructura etaria, sexo, escolaridad, nivel socioeconómico y tasas de participación 2018–2024. Fuentes: INE (electoral), IIEG (sociodemográfico) e INEGI (nivel socioeconómico). Sin datos personales identificables.',
+      pageW - margin * 2,
+    );
+    doc.text(metodo, margin, y);
+    y += metodo.length * 4 + 8;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Fuentes:', margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    for (const s of DATA_SOURCES) {
+      const lines = doc.splitTextToSize(`• ${s}`, pageW - margin * 2);
+      if (y + lines.length * 3.5 > 285) {
+        doc.addPage();
+        y = 16;
+      }
+      doc.text(lines, margin, y);
+      y += lines.length * 3.5;
+    }
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Elaboración:', margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.text(TEAM.join(' · '), margin, y);
+
+    const nPages = doc.getNumberOfPages();
+    for (let i = 1; i <= nPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(127, 76, 165);
+      doc.text(`Pág. ${i}/${nPages}`, pageW - margin, 290, { align: 'right' });
+    }
+
+    doc.save('informe-perfiles-ciudadanos-participacion-zmg.pdf');
   }
-
-  private buildHtml(
-    perfiles: Perfil[],
-    meta?: { n_colonias?: number; k?: number; municipios?: string[] },
-  ): string {
-    const rows = perfiles
-      .map(
-        (p) => `
-      <tr>
-        <td><span class="swatch" style="background:${p.color}"></span> ${esc(p.nombre)}</td>
-        <td>${p.n_colonias}</td>
-        <td>${p.pct_universo}%</td>
-        <td>${p.metricas['tasa_2024'] ?? '—'}%</td>
-        <td>${p.metricas['pct_joven_prom'] ?? '—'}%</td>
-        <td>${p.metricas['escolaridad_prom'] ?? '—'}</td>
-        <td>${p.metricas['nse_prom'] ?? '—'}</td>
-      </tr>`,
-      )
-      .join('');
-
-    const strategies = perfiles
-      .map(
-        (p) => `
-      <section class="card">
-        <h3><span class="swatch" style="background:${p.color}"></span> ${esc(p.nombre)}</h3>
-        <p class="desc">${esc(p.descripcion)}</p>
-        <p class="msg">“${esc(p.estrategia?.mensaje)}”</p>
-        <p><b>Canales:</b> ${(p.estrategia?.canales || []).map(esc).join(' · ')}</p>
-        <p><b>Tono:</b> ${esc(p.estrategia?.tono)}</p>
-        <p><b>Acciones:</b></p>
-        <ul>${(p.estrategia?.acciones || []).map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
-      </section>`,
-      )
-      .join('');
-
-    const munis = (meta?.municipios || []).map(esc).join(', ');
-    const nCol =
-      meta?.n_colonias ?? perfiles.reduce((a, p) => a + (p.n_colonias || 0), 0);
-
-    return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8"/>
-<title>Informe Segmentador CCPC — ZMG</title>
-<style>
-  @page { margin: 16mm; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #4b1c71; margin: 0; padding: 24px; background: #fff; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  h2 { font-size: 15px; margin: 28px 0 10px; border-bottom: 2px solid #dbb6ee; padding-bottom: 6px; }
-  h3 { font-size: 14px; margin: 0 0 8px; }
-  .sub { color: #7f4ca5; font-size: 12px; margin-bottom: 18px; }
-  .meta { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 20px; }
-  .pill { background: #fff0ff; border-radius: 999px; padding: 6px 12px; font-size: 11px; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th, td { border: 1px solid #dbb6ee; padding: 8px; text-align: left; }
-  th { background: #fff0ff; }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-  .card { border: 1px solid #dbb6ee; border-radius: 12px; padding: 14px; margin-bottom: 12px; page-break-inside: avoid; }
-  .desc { font-size: 12px; color: #5a3a7a; }
-  .msg { font-style: italic; background: #fff0ff; padding: 10px 12px; border-radius: 10px; }
-  footer { margin-top: 32px; font-size: 10px; color: #7f4ca5; border-top: 1px solid #dbb6ee; padding-top: 12px; }
-  ul { margin: 4px 0 0 18px; padding: 0; font-size: 12px; }
-  .print-hint { font-size: 12px; color: #7f4ca5; margin-bottom: 16px; padding: 10px 12px; background: #fff0ff; border-radius: 10px; }
-  @media print { .print-hint { display: none; } }
-</style>
-</head>
-<body>
-  <p class="print-hint">En el diálogo de impresión elige <b>Guardar como PDF</b> / <b>Microsoft Print to PDF</b>.</p>
-  <h1>Segmentador CCPC — Perfiles de participación</h1>
-  <p class="sub">${PROJECT_TAGLINE}</p>
-  <div class="meta">
-    <span class="pill">${nCol} colonias</span>
-    <span class="pill">k = ${meta?.k ?? perfiles.length}</span>
-    <span class="pill">ZMG Jalisco</span>
-  </div>
-  <p style="font-size:12px;color:#7f4ca5">Municipios: ${munis || '—'}</p>
-
-  <h2>1. Resumen de perfiles (K-Means)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Perfil</th><th>Colonias</th><th>% universo</th>
-        <th>Part. 2024</th><th>% joven</th><th>Escolaridad</th><th>NSE</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-
-  <h2>2. Estrategias diferenciadas para el INE</h2>
-  ${strategies}
-
-  <h2>3. Método (lectura para evaluación)</h2>
-  <p style="font-size:12px;line-height:1.5">
-    Se segmentaron colonias de la ZMG con K-Means sobre variables agregadas:
-    estructura etaria, sexo, escolaridad, nivel socioeconómico y tasas de participación
-    2018–2024. Fuentes: INE (electoral), IIEG (sociodemográfico) e INEGI (nivel socioeconómico).
-    No se utiliza información personal identificable.
-  </p>
-
-  <footer>
-    <p><b>Fuentes:</b></p>
-    <ul>${DATA_SOURCES.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
-    <p style="margin-top:12px"><b>Elaboración:</b></p>
-    <p>${TEAM.map(esc).join(' · ')}</p>
-  </footer>
-</body>
-</html>`;
-  }
-}
-
-function esc(s: string | number | undefined | null): string {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

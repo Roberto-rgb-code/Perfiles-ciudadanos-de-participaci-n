@@ -33,7 +33,7 @@ const CARTO = `${SRC_INE} (límites seccionales) + ${SRC_IIEG} (colonia ISDCOL).
 export const LAYERS: LayerDef[] = [
   {
     id: 'perfiles',
-    label: 'Perfiles de participación',
+    label: 'Perfiles ciudadanos de participación',
     group: 'Segmentación',
     kind: 'cat',
     prop: 'cluster_id',

@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, Perfil } from '../core/api.service';
 import { IconComponent } from '../core/icon.component';
@@ -22,7 +23,7 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
   selector: 'app-profiles-page',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [CommonModule, RouterLink, IconComponent],
+  imports: [CommonModule, FormsModule, RouterLink, IconComponent],
   template: `
     <div class="absolute inset-0 overflow-auto bg-[var(--surface)] p-5 md:p-7">
       <section class="panel-card mb-5 p-5">
@@ -35,8 +36,7 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
               <p class="chip mb-1">Reto 1 · ¿Qué tipos de ciudadanía existen?</p>
               <h2 class="text-2xl font-bold text-brand-900">Catálogo de perfiles ciudadanos</h2>
               <p class="mt-1 max-w-3xl text-sm text-brand-700">
-                Segmentación K-Means con edad, sexo, escolaridad, nivel socioeconómico e historial
-                electoral agregado (sin datos personales).
+                Usa el buscador y filtros para localizar perfiles. PDF descarga solo los visibles.
               </p>
             </div>
           </div>
@@ -47,23 +47,42 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
             </span>
           </button>
         </div>
+
+        <div class="mt-4 grid gap-3 md:grid-cols-3">
+          <label class="md:col-span-2 block">
+            <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-700">Buscar</span>
+            <input class="filter-input" type="search" placeholder="Nombre, descripción, slug…"
+              [ngModel]="query()" (ngModelChange)="query.set($event); apply()" />
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-brand-700">NSE mínimo</span>
+            <select class="filter-input" [ngModel]="minNse()" (ngModelChange)="minNse.set(+$event); apply()">
+              <option [ngValue]="0">Todos</option>
+              <option [ngValue]="3">≥ 3</option>
+              <option [ngValue]="4">≥ 4</option>
+              <option [ngValue]="5">≥ 5</option>
+              <option [ngValue]="6">≥ 6</option>
+            </select>
+          </label>
+        </div>
+        <p class="mt-2 text-[11px] font-semibold text-brand-700">
+          {{ filtered().length }} perfil(es) visibles
+        </p>
       </section>
 
       <div class="mb-4 grid gap-4 lg:grid-cols-2">
         <div class="panel-card p-4">
-          <h3 class="mb-1 text-sm font-bold text-brand-900">Peso de cada perfil en la ZMG</h3>
-          <p class="mb-2 text-[11px] text-brand-700">Pastel por número de colonias</p>
+          <h3 class="mb-1 text-sm font-bold text-brand-900">Peso de cada perfil</h3>
           <div #pieHost></div>
         </div>
         <div class="panel-card p-4">
           <h3 class="mb-1 text-sm font-bold text-brand-900">Comparativo por variable</h3>
-          <p class="mb-2 text-[11px] text-brand-700">Barras por perfil (P0–P4) en cada métrica CCPC</p>
           <div #radarHost></div>
         </div>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        @for (p of perfiles(); track p.cluster_id) {
+        @for (p of filtered(); track p.cluster_id) {
           <article class="panel-card relative overflow-hidden p-5 transition hover:-translate-y-0.5">
             <div class="absolute inset-x-0 top-0 h-1.5" [style.background]="p.color"></div>
             <div class="mb-3 flex items-center justify-between">
@@ -89,14 +108,6 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
                 <dt class="text-brand-700">Nivel socioeconómico</dt>
                 <dd class="font-bold text-brand-900">{{ p.metricas['nse_prom'] }}</dd>
               </div>
-              <div class="rounded-2xl bg-brand-50 p-2.5">
-                <dt class="text-brand-700">Escolaridad</dt>
-                <dd class="font-bold text-brand-900">{{ p.metricas['escolaridad_prom'] }} años</dd>
-              </div>
-              <div class="rounded-2xl bg-brand-50 p-2.5">
-                <dt class="text-brand-700">Población</dt>
-                <dd class="font-bold text-brand-900">{{ p.metricas['poblacion'] | number }}</dd>
-              </div>
             </dl>
             <a routerLink="/campanas" [queryParams]="{c: p.cluster_id}"
               class="mt-4 inline-flex items-center gap-2 rounded-full bg-brand-900 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white">
@@ -104,6 +115,10 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
               Ver estrategia
             </a>
           </article>
+        } @empty {
+          <p class="panel-card p-6 text-sm text-brand-700 md:col-span-2 xl:col-span-3">
+            Ningún perfil coincide con la búsqueda / filtros.
+          </p>
         }
       </div>
 
@@ -119,7 +134,10 @@ const PALETTE = ['#4b1c71', '#7f4ca5', '#b57edc', '#9d4edd', '#5a189a'];
 export class ProfilesPageComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private report = inject(ReportService);
-  perfiles = signal<Perfil[]>([]);
+  all = signal<Perfil[]>([]);
+  filtered = signal<Perfil[]>([]);
+  query = signal('');
+  minNse = signal(0);
   meta: any;
   sources = DATA_SOURCES;
   team = TEAM;
@@ -130,8 +148,8 @@ export class ProfilesPageComponent implements OnInit, OnDestroy {
     this.api.perfiles().subscribe((p) => {
       this.meta = p;
       const colored = p.perfiles.map((x, i) => ({ ...x, color: PALETTE[i % PALETTE.length] }));
-      this.perfiles.set(colored);
-      queueMicrotask(() => this.render(colored));
+      this.all.set(colored);
+      this.apply();
     });
   }
 
@@ -140,8 +158,20 @@ export class ProfilesPageComponent implements OnInit, OnDestroy {
     try { clearHost(this.radarHost().nativeElement); } catch { /* */ }
   }
 
+  apply() {
+    const q = this.query().trim().toLowerCase();
+    const min = this.minNse();
+    const rows = this.all().filter((p) => {
+      if (Number(p.metricas['nse_prom'] || 0) < min) return false;
+      if (!q) return true;
+      return `${p.nombre} ${p.descripcion} ${p.slug}`.toLowerCase().includes(q);
+    });
+    this.filtered.set(rows);
+    queueMicrotask(() => this.render(rows));
+  }
+
   exportPdf() {
-    this.report.downloadInforme(this.perfiles(), {
+    this.report.downloadInforme(this.filtered().length ? this.filtered() : this.all(), {
       n_colonias: this.meta?.n_colonias,
       k: this.meta?.k,
       municipios: this.meta?.municipios,
@@ -149,10 +179,12 @@ export class ProfilesPageComponent implements OnInit, OnDestroy {
   }
 
   private render(rows: Perfil[]) {
-    drawPie(
-      this.pieHost().nativeElement,
-      rows.map((r) => ({ nombre: r.nombre, color: r.color, value: r.n_colonias })),
-    );
+    if (!rows.length) {
+      try { clearHost(this.pieHost().nativeElement); } catch { /* */ }
+      try { clearHost(this.radarHost().nativeElement); } catch { /* */ }
+      return;
+    }
+    drawPie(this.pieHost().nativeElement, rows.map((r) => ({ nombre: r.nombre, color: r.color, value: r.n_colonias })));
     drawMetricFacets(
       this.radarHost().nativeElement,
       rows.map((p) => ({

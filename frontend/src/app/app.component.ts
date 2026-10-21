@@ -17,7 +17,7 @@ import { DATA_SOURCES, SOURCES_SHORT, TEAM } from './core/credits';
             <app-icon icon="line-md:account" [size]="22" color="#fff" />
           </div>
           <div class="min-w-0">
-            <p class="truncate text-sm font-bold leading-tight">Segmentador CCPC</p>
+            <p class="truncate text-[13px] font-bold leading-tight sm:text-sm">Perfiles ciudadanos de participación</p>
             <p class="truncate text-[10px] font-semibold uppercase tracking-wider text-brand-300">
               Hackatón INE · Reto 1 · ZMG
             </p>

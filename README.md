@@ -1,4 +1,4 @@
-# Segmentador Ciudadano CCPC — ZMG (Reto 1 INE)
+# Perfiles ciudadanos de participación — ZMG (Reto 1 INE)
 
 Prototipo de hackatón: **perfiles de participación ciudadana** con clustering K-Means sobre datos **agregados** (sin PII) de la Zona Metropolitana de Guadalajara.
 

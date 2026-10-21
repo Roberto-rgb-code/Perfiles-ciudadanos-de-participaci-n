@@ -10,8 +10,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from app.config import settings
 
 app = FastAPI(
-    title="Segmentador Ciudadano CCPC — ZMG",
-    description="Reto 1 INE · Perfiles de participación (piloto ZMG Jalisco)",
+    title="Perfiles ciudadanos de participación — ZMG",
+    description="Reto 1 INE · Perfiles ciudadanos de participación (piloto ZMG Jalisco)",
     version="0.1.0",
 )
 

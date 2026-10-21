@@ -67,4 +67,4 @@ export const TEAM = [
 ];
 
 export const PROJECT_TAGLINE =
-  'Hackatón INE · Reto 1 — Perfiles de participación ciudadana (piloto ZMG)';
+  'Hackatón INE · Reto 1 — Perfiles ciudadanos de participación (piloto ZMG)';

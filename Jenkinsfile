@@ -1,5 +1,5 @@
 /**
- * Segmentador CCPC ZMG — CI/CD QA
+ * Perfiles ciudadanos de participación — ZMG · CI/CD QA
  * Stages: lint · pytest · Angular build · Docker images
  */
 pipeline {
@@ -54,7 +54,7 @@ pipeline {
         }
     }
     post {
-        success { echo 'QA Segmentador CCPC ZMG: OK' }
+        success { echo 'QA Perfiles ciudadanos de participación ZMG: OK' }
         failure { echo 'QA FALLÓ — revisar logs' }
     }
 }
