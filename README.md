@@ -12,11 +12,11 @@ Piloto territorial para identificar **perfiles de participación ciudadana** en 
 
 | Servicio | URL |
 |----------|-----|
-| **Frontend** | _pendiente — Railway tiene builds pausados a nivel plataforma; el deploy se reintenta automáticamente_ |
-| API | _(se publica al completar el deploy)_ |
+| **Frontend** | https://web-production-0eaf34.up.railway.app |
+| API | https://api-production-f1ca.up.railway.app/api/health |
 
-Proyecto Railway: `perfiles-ccpc-zmg` · servicios `web` + `api` + `Postgres` (PostGIS vía extensión).  
-Scripts: `deploy/railway-deploy.ps1` / `deploy/railway-retry-until-up.ps1`.
+Proyecto Railway: `perfiles-ccpc-zmg` · servicios `web` + `api` + `Postgres`.  
+Scripts: `deploy/railway-deploy.ps1`.
 
 ---
 

@@ -36,9 +36,11 @@ railway variable set `
   "CORS_ORIGINS=*" `
   --service api --skip-deploys
 
-Write-Host "==> Variables web"
+Write-Host "==> Variables api PORT + web upstream (Railway inyecta PORT=8080 al api)"
+railway variable set "PORT=8080" --service api --skip-deploys
 railway variable set `
-  "API_UPSTREAM=http://`${{api.RAILWAY_PRIVATE_DOMAIN}}:`${{api.PORT}}" `
+  "API_UPSTREAM=http://`${{api.RAILWAY_PRIVATE_DOMAIN}}:8080" `
+  "PORT=80" `
   --service web --skip-deploys
 
 Write-Host "==> Deploy api"
@@ -47,7 +49,7 @@ railway up --service api --detach --ci --no-gitignore --message "deploy api"
 Remove-Item -Force Dockerfile -ErrorAction SilentlyContinue
 
 Write-Host "==> Domain api"
-railway domain --service api --port 8000 --json
+railway domain --service api --port 8080 --json
 
 Write-Host "==> Deploy web"
 Copy-Item -Force Dockerfile.web Dockerfile
